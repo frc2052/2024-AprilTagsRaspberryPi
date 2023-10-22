@@ -170,8 +170,6 @@ class Tag():
         self.locations = {}
         self.orientations = {}
         self.found_tags = []
-        self.tag_last_update = {}
-        self.total_frames = 0
         corr = np.eye(3)
         corr[0, 0] = -1
         self.tag_corr = corr
@@ -203,15 +201,11 @@ class Tag():
         #inches to meters
         return np.array([[x],[y],[z]])*0.0254
     
-    def addFoundTag(self, tags):
-        self.total_frames += 1
-        self.found_tags.clear()
-        for tag in detected_tags:
-            if tag.hamming < 0.5:
-                # check if the tag has been seen for more than x amount of frames
-                self.tag_last_update[tag.tag_id] = self.total_frames
-                if self.total_frames - self.tag_last_update[tag.tag_id] < 3:
-                    self.found_tags.append(tag)
+    def addFoundTags(self, tags):
+        self.found_tags = []
+        for tag in tags:
+            if tag.hamming < 9:
+                self.found_tags.append(tag)
 
 
     def getFilteredTags(self):
@@ -245,16 +239,19 @@ class Tag():
 
 # Constants
 
-RES = (640,480)
+RES = (320,240)
 
 camera_info = {}
 camera_info["res"] = RES
 # Camera Parameters:
 # [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
-camera_info["params"] = [669.13345619, 684.76325169, 319.63326201, 243.27625621]
+# focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
+# 640,480 res: camera_info["params"] = [669.13345619, 684.76325169, 319.63326201, 243.27625621]
+camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
+#camera_info["params"] = [269.1801476, 269.1801476, 320, 240]
 
-TAG_SIZE = 0.1524
-FAMILIES = "tag16h5"
+TAG_SIZE = 0.1651
+FAMILIES = "tag36h11"
 tags = Tag(TAG_SIZE, FAMILIES)
 
 ####################################################################################
@@ -264,7 +261,18 @@ tags = Tag(TAG_SIZE, FAMILIES)
 # add tags:
 # takes in id,x,y,z,theta_x,theta_y,theta_z
 
-tags.addTag(1, 0., 0., 0., 0., 0., 0.)
+# CURRENTLY SET FOR 2023 - CHARGED UP LOCATIONS (origin at BLUE ALLIANCE DIAMOND PLATE (X), CARPET (Y), SIDE BORDER POLYCARB (Z))
+# note: FIRST uses Z up and down, X as forward and backward, Y as left and right. The April Tag calculator use Z as forwards and backwards, X as left and right, Y as up and down. This will be addressed when we send the data off.
+
+tags.addTag(0,0,0,0,0,0,0)
+tags.addTag(1, 0., 18.22, 0., 0., 0., 180)
+tags.addTag(2, 0., 18.22, 0., 0., 0., 180)
+tags.addTag(3, 0., 18.22, 0., 0., 0., 180)
+tags.addTag(4, 0., 27.38, 0., 0., 0., 180)
+tags.addTag(5, 0., 27.38, 0., 0., 0., 0.)
+tags.addTag(6, 0., 18.22, 0., 0., 0., 0.)
+tags.addTag(7, 0., 18.22, 0., 0., 0., 0.)
+tags.addTag(8, 0., 18.22, 0., 0., 0., 0.)
 
 # camera starting pos
 
@@ -350,20 +358,20 @@ if __name__ == "__main__":
 
     # start cameras
     # work around wpilibsuite/allwpilib#5055
-    CameraServer.setSize(CameraServer.kSize160x120)
+    CameraServer.setSize(CameraServer.kSize320x240)
     for config in cameraConfigs:
         cameras.append(startCamera(config))
 
-    detector = Detector(families='tag16h5',
-                        nthreads=2,
-                        quad_decimate=4,
-                        quad_sigma=0.5,
-                        refine_edges=2,
-                        decode_sharpening=0.25,
+    detector = Detector(families='tag36h11',
+                        nthreads=3,
+                        quad_decimate=2,
+                        quad_sigma=0,
+                        refine_edges=1,
+                        decode_sharpening=0,
                         debug=0
                         )
     cvSink = CameraServer.getVideo()
-    processedOutput = CameraServer.putVideo("processedOutput", 640, 480)
+    processedOutput = CameraServer.putVideo("processedOutput", 320, 240)
 
     frame = np.zeros(shape=(RES[1], RES[0], 3), dtype=np.uint8)
 
@@ -379,8 +387,9 @@ if __name__ == "__main__":
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         detected_tags = detector.detect(gray, estimate_tag_pose=True, camera_params=camera_info["params"], tag_size=TAG_SIZE)
-        for tag in detected_tags:
-            tags.addFoundTag(tag)
+        tags.addFoundTags(detected_tags)
+        
+        processedOutput.putFrame(visualize_frame(frame, tags.getFilteredTags()))
         
         outputTags = []
 
@@ -398,21 +407,22 @@ if __name__ == "__main__":
             y = (int((t[1]).astype(float)*39.37*1000)) / 1000
             z = (int((t[2]).astype(float)*39.37*1000)) / 1000
             #pose = np.multiply(estimate_camera_pose(tags.get_estimated_tag_poses()), 39.37)
-            #pose = np.multiply(tags.estimate_tag_pose(ID, R, t), 39.37)
-            distances = [x, y, z]
-            angles  = [yaw, pitch, roll]
+            pose = np.multiply(tags.estimate_tag_pose(ID, R, t), 39.37)
+            #distances = [x, y, z]
+            #angles  = [yaw, pitch, roll]
             
-            #raspberryPiTable.putString("Pose Average" + str(ID), str(pose))
+            
+            # TODO: reformat pose xyz order (refer to note right above where we add the tags in)
+            raspberryPiTable.putString("Pose Average" + str(ID), str(pose))
             #outputTags.append(str([ID, distances, angles]))
             raspberryPiTable.putValue("Tag " + str(ID) + " x:", x)
             raspberryPiTable.putValue("Tag " + str(ID) + " y:", y)
             raspberryPiTable.putValue("Tag " + str(ID) + " z:", z)
-            raspberryPiTable.putValue("Tag " + str(ID) + " yaw:", yaw)
-            raspberryPiTable.putValue("Tag " + str(ID) + " pitch:", pitch)
-            raspberryPiTable.putValue("Tag " + str(ID) + " roll:", roll)
+            #raspberryPiTable.putValue("Tag " + str(ID) + " yaw:", yaw)
+            #raspberryPiTable.putValue("Tag " + str(ID) + " pitch:", pitch)
+            #raspberryPiTable.putValue("Tag " + str(ID) + " roll:", roll)
 
         #tags.findClosestTag()
-        processedOutput.putFrame(visualize_frame(frame, tags.getFilteredTags()))
 
 """
 
@@ -434,7 +444,7 @@ benefit from non-zero values (e.g. 0.8), default: 0.0
 refine_edges : When non-zero, the edges of the each quad are adjusted to “snap to” 
 strong gradients nearby. This is useful when decimation is employed, as it can increase 
 the quality of the initial quad estimate substantially. Generally recommended to be 
-on (1). Very computationally inexpensive. Option is ignored if quad_decimate = 1, 
+on (1). Very computationally inexpensive. Option is ignored if quad_decimate = 0, 
 default: 1
 
 decode_sharpening : How much sharpening should be done to decoded images? This can 
