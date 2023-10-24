@@ -239,16 +239,22 @@ class Tag():
 
 # Constants
 
-RES = (320,240)
-
-camera_info = {}
-camera_info["res"] = RES
 # Camera Parameters:
+camera_info = {}
 # [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
 # focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
-# 640,480 res: camera_info["params"] = [669.13345619, 684.76325169, 319.63326201, 243.27625621]
+
+# 1280,960 res: **UNTESTED**
+#camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
+#RES = (1280,960)
+# 640,480 res: 
+#camera_info["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
+#RES = (640,480)
+# 320,240 res: 
 camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
-#camera_info["params"] = [269.1801476, 269.1801476, 320, 240]
+RES = (320,240)
+
+camera_info["res"] = RES
 
 TAG_SIZE = 0.1651
 FAMILIES = "tag36h11"
@@ -358,7 +364,7 @@ if __name__ == "__main__":
 
     # start cameras
     # work around wpilibsuite/allwpilib#5055
-    CameraServer.setSize(CameraServer.kSize320x240)
+    CameraServer.setSize(CameraServer.kSize640x480)
     for config in cameraConfigs:
         cameras.append(startCamera(config))
 
@@ -371,7 +377,7 @@ if __name__ == "__main__":
                         debug=0
                         )
     cvSink = CameraServer.getVideo()
-    processedOutput = CameraServer.putVideo("processedOutput", 320, 240)
+    processedOutput = CameraServer.putVideo("processedOutput", RES[0], RES[1])
 
     frame = np.zeros(shape=(RES[1], RES[0], 3), dtype=np.uint8)
 
@@ -402,22 +408,23 @@ if __name__ == "__main__":
             pitch =  math.degrees(math.atan2(R[1,2]/math.cos(yaw), R[2,2]/math.cos(yaw)))
             roll = math.degrees(math.atan2(R[1,0]/math.cos(yaw), R[0,0]/math.cos(yaw)))
 
-            # convert meters to inches
-            x = (int((t[0]).astype(float)*39.37*1000)) / 1000
-            y = (int((t[1]).astype(float)*39.37*1000)) / 1000
-            z = (int((t[2]).astype(float)*39.37*1000)) / 1000
-            #pose = np.multiply(estimate_camera_pose(tags.get_estimated_tag_poses()), 39.37)
-            pose = np.multiply(tags.estimate_tag_pose(ID, R, t), 39.37)
+            # convert meters to inches (inches * 39.37)
+            inchesInAMeter = 39.37
+            x = (int((t[0]).astype(float)*inchesInAMeter*1000)) / 1000
+            y = (int((t[1]).astype(float)*inchesInAMeter*1000)) / 1000
+            z = (int((t[2]).astype(float)*inchesInAMeter*1000)) / 1000
+            #pose = np.multiply(estimate_camera_pose(tags.get_estimated_tag_poses()), inchesInAMeter)
+            pose = np.multiply(tags.estimate_tag_pose(ID, R, t), inchesInAMeter)
             #distances = [x, y, z]
             #angles  = [yaw, pitch, roll]
             
             
             # TODO: reformat pose xyz order (refer to note right above where we add the tags in)
-            raspberryPiTable.putString("Pose Average" + str(ID), str(pose))
+            raspberryPiTable.putNumberArray("piPose", pose)
             #outputTags.append(str([ID, distances, angles]))
-            raspberryPiTable.putValue("Tag " + str(ID) + " x:", x)
-            raspberryPiTable.putValue("Tag " + str(ID) + " y:", y)
-            raspberryPiTable.putValue("Tag " + str(ID) + " z:", z)
+            #raspberryPiTable.putValue("Tag " + str(ID) + " x:", x)
+            #raspberryPiTable.putValue("Tag " + str(ID) + " y:", y)
+            #raspberryPiTable.putValue("Tag " + str(ID) + " z:", z)
             #raspberryPiTable.putValue("Tag " + str(ID) + " yaw:", yaw)
             #raspberryPiTable.putValue("Tag " + str(ID) + " pitch:", pitch)
             #raspberryPiTable.putValue("Tag " + str(ID) + " roll:", roll)
