@@ -268,7 +268,8 @@ tags = Tag(TAG_SIZE, FAMILIES)
 # takes in id,x,y,z,theta_x,theta_y,theta_z
 
 # CURRENTLY SET FOR 2023 - CHARGED UP LOCATIONS (origin at BLUE ALLIANCE DIAMOND PLATE (X), CARPET (Y), SIDE BORDER POLYCARB (Z))
-# note: FIRST uses Z up and down, X as forward and backward, Y as left and right. The April Tag calculator use Z as forwards and backwards, X as left and right, Y as up and down. This will be addressed when we send the data off.
+#The April Tag calculator use Z as forwards and backwards, X as left and right, Y as up and down. This will be addressed when we send the data off.
+# note: FIRST uses Z up and down, X as forward and backward, Y as left and right. 
 
 tags.addTag(0,0,0,0,0,0,0)
 tags.addTag(1, 0., 18.22, 0., 0., 0., 180)
@@ -418,9 +419,11 @@ if __name__ == "__main__":
             #distances = [x, y, z]
             #angles  = [yaw, pitch, roll]
             
-            
-            # TODO: reformat pose xyz order (refer to note right above where we add the tags in)
-            raspberryPiTable.putNumberArray("piPose", pose)
+            # pose detector gives x (left and right), y (up and down),z (forward backward)
+            # robot uses x(forward backward), y(up and down), z (left and right)
+            camera_pose = [7.25, 41.5, 7]
+            robot_pose = [(pose[0] + camera_pose[0]), (pose[1] - camera_pose[1]), (pose[2] - camera_pose[2])]
+            raspberryPiTable.putNumberArray("robotPose", robot_pose)
             #outputTags.append(str([ID, distances, angles]))
             #raspberryPiTable.putValue("Tag " + str(ID) + " x:", x)
             #raspberryPiTable.putValue("Tag " + str(ID) + " y:", y)
