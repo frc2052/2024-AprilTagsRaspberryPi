@@ -248,11 +248,11 @@ camera_info = {}
 #camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
 #RES = (1280,960)
 # 640,480 res: 
-#camera_info["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
-#RES = (640,480)
+camera_info["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
+RES = (640,480)
 # 320,240 res: 
-camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
-RES = (320,240)
+#camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
+#RES = (320,240)
 
 camera_info["res"] = RES
 
@@ -272,7 +272,7 @@ tags = Tag(TAG_SIZE, FAMILIES)
 # note: FIRST uses Z up and down, X as forward and backward, Y as left and right. 
 
 tags.addTag(0,0,0,0,0,0,0)
-tags.addTag(1, 0., 18.22, 0., 0., 0., 180)
+tags.addTag(1, 0., 0, 0., 0., 0., 0)
 tags.addTag(2, 0., 18.22, 0., 0., 0., 180)
 tags.addTag(3, 0., 18.22, 0., 0., 0., 180)
 tags.addTag(4, 0., 27.38, 0., 0., 0., 180)
@@ -421,16 +421,10 @@ if __name__ == "__main__":
             
             # pose detector gives x (left and right), y (up and down),z (forward backward)
             # robot uses x(forward backward), y(up and down), z (left and right)
-            camera_pose = [7.25, 41.5, 7]
-            robot_pose = [(pose[0] + camera_pose[0]), (pose[1] - camera_pose[1]), (pose[2] - camera_pose[2])]
+            camera_pose_on_robot = [7.25, 43.5, 7]
+            robot_pose = [(pose[0] + camera_pose_on_robot[0]), (pose[1] - camera_pose_on_robot[1]), (pose[2] + camera_pose_on_robot[2])]
             raspberryPiTable.putNumberArray("robotPose", robot_pose)
-            #outputTags.append(str([ID, distances, angles]))
-            #raspberryPiTable.putValue("Tag " + str(ID) + " x:", x)
-            #raspberryPiTable.putValue("Tag " + str(ID) + " y:", y)
-            #raspberryPiTable.putValue("Tag " + str(ID) + " z:", z)
-            #raspberryPiTable.putValue("Tag " + str(ID) + " yaw:", yaw)
-            #raspberryPiTable.putValue("Tag " + str(ID) + " pitch:", pitch)
-            #raspberryPiTable.putValue("Tag " + str(ID) + " roll:", roll)
+            #raspberryPiTable.putNumberArray("cameraPose", pose)
 
         #tags.findClosestTag()
 
