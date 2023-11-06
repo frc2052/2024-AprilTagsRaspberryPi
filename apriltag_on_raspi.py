@@ -15,49 +15,6 @@ import math
 from cscore import CameraServer, VideoSource, UsbCamera, MjpegServer
 from ntcore import NetworkTableInstance, EventFlags
 
-#   JSON format:
-#   {
-#       "team": <team number>,
-#       "ntmode": <"client" or "server", "client" if unspecified>
-#       "cameras": [
-#           {
-#               "name": <camera name>
-#               "path": <path, e.g. "/dev/video0">
-#               "pixel format": <"MJPEG", "YUYV", etc>   // optional
-#               "width": <video mode width>              // optional
-#               "height": <video mode height>            // optional
-#               "fps": <video mode fps>                  // optional
-#               "brightness": <percentage brightness>    // optional
-#               "white balance": <"auto", "hold", value> // optional
-#               "exposure": <"auto", "hold", value>      // optional
-#               "properties": [                          // optional
-#                   {
-#                       "name": <property name>
-#                       "value": <property value>
-#                   }
-#               ],
-#               "stream": {                              // optional
-#                   "properties": [
-#                       {
-#                           "name": <stream property name>
-#                           "value": <stream property value>
-#                       }
-#                   ]
-#               }
-#           }
-#       ]
-#       "switched cameras": [
-#           {
-#               "name": <virtual camera name>
-#               "key": <network table key used for selection>
-#               // if NT value is a string, it's treated as a name
-#               // if NT value is a double, it's treated as an integer index
-#           }
-#       ]
-#   }
-
-
-
 configFile = "/boot/frc.json"
 
 class CameraConfig: pass
@@ -173,9 +130,11 @@ class Tag():
         corr = np.eye(3)
         corr[0, 0] = -1
         self.tag_corr = corr
+        
     def addTag(self,id,x,y,z,theta_x,theta_y,theta_z):
         self.locations[id]=self.inchesToTranslationVector(x,y,z)
         self.orientations[id]=self.eulerAnglesToRotationMatrix(theta_x,theta_y,theta_z)
+        
     # Calculates Rotation Matrix given euler angles.
     def eulerAnglesToRotationMatrix(self, theta_x,theta_y,theta_z):
         R_x = np.array([[1, 0, 0],
@@ -207,83 +166,12 @@ class Tag():
             if tag.hamming < 9:
                 self.found_tags.append(tag)
 
-
     def getFilteredTags(self):
         return self.found_tags
 
-    def estimate_tag_pose(self, tag_id, R,t):
+    def estimateTagPose(self, tag_id, R,t):
         local = self.tag_corr @ np.transpose(R) @ t
         return np.matmul(self.orientations[tag_id], local + self.locations[tag_id])
-    def get_estimated_tag_poses(self):
-        estimated_tag_poses = []
-        for tag in self.found_tags:
-            estimated_tag_poses.append(self.estimate_tag_pose(tag.tag_id, tag.pose_R, tag.pose_t))
-        return estimated_tag_poses
-        
-    def findClosestTag(self):
-        closest_tag = {}
-        for tag in self.found_tags:
-            p = self.estimate_pose(tag.tag_id, tag.pose_R, tag.pose_t)
-            diff = 0
-            N = len(closest_tag)
-            M = len(p)
-            # Traverse in each row
-            for i in range(N):
-                # Traverse in column of that row
-                for j in range(M):
-                    diff += p[i][j]
-            
-            print(diff)
-
-####################################################################################
-
-# Constants
-
-# Camera Parameters:
-camera_info = {}
-# [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
-# focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
-
-# 1280,960 res: **UNTESTED**
-#camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
-#RES = (1280,960)
-# 640,480 res: 
-camera_info["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
-RES = (640,480)
-# 320,240 res: 
-#camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
-#RES = (320,240)
-
-camera_info["res"] = RES
-
-TAG_SIZE = 0.1651
-FAMILIES = "tag36h11"
-tags = Tag(TAG_SIZE, FAMILIES)
-
-####################################################################################
-
-# INITIALIZE VARIABLES #
-
-# add tags:
-# takes in id,x,y,z,theta_x,theta_y,theta_z
-
-# CURRENTLY SET FOR 2023 - CHARGED UP LOCATIONS (origin at BLUE ALLIANCE DIAMOND PLATE (X), CARPET (Y), SIDE BORDER POLYCARB (Z))
-#The April Tag calculator use Z as forwards and backwards, X as left and right, Y as up and down. This will be addressed when we send the data off.
-# note: FIRST uses Z up and down, X as forward and backward, Y as left and right. 
-
-tags.addTag(0,0,0,0,0,0,0)
-tags.addTag(1, 0., 0, 0., 0., 0., 0)
-tags.addTag(2, 0., 18.22, 0., 0., 0., 180)
-tags.addTag(3, 0., 18.22, 0., 0., 0., 180)
-tags.addTag(4, 0., 27.38, 0., 0., 0., 180)
-tags.addTag(5, 0., 27.38, 0., 0., 0., 0.)
-tags.addTag(6, 0., 18.22, 0., 0., 0., 0.)
-tags.addTag(7, 0., 18.22, 0., 0., 0., 0.)
-tags.addTag(8, 0., 18.22, 0., 0., 0., 0.)
-
-# camera starting pos
-
-camera_pose  = np.array([[0], [0], [0]])
 
 ####################################################################################
 
@@ -308,36 +196,75 @@ def visualize_frame(img, tags):
         cv2.circle(color_img, tuple(tag.corners[0].astype(int)), 2, color=(255, 0, 255), thickness=3)
     
     return color_img
+
 ####################################################################################
 
 # Pose Estimation
 
-def estimate_camera_pose(estimated_tags):
-    
-    tmp_poses= [estimated_tags]
-    estimated_poses_list = []
+class PoseEstimator():
 
-    for pose in tmp_poses:
-        # Apply filtering to smooth results
-        tag_relative_camera_pose = np.linalg.inv(pose)
+    def estimatePoseMeters(self):
+        
+        estimated_poses_list = []
 
-        # Find the camera position relative to the tag position
-        world_camera_pose = np.matmul(pose, tag_relative_camera_pose)
+        for tag in tags.getFilteredTags():
+            estimated_poses_list.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
+        
+        if not estimated_poses_list:
+            # If we have no samples, report none
+            return (None, estimated_poses_list)
+                
+        total = np.array([0.0, 0.0, 0.0])
+        for pose in estimated_poses_list:
+            print("added pose array" + str(pose[0]))
+            total = np.add(total, pose)
+        average = np.divide(len(estimated_poses_list), total)
+        return (average)
+        
+####################################################################################
 
-        # Find the position of the robot from the camera position
-        inv_rel_camera_pose = np.linalg.inv(camera_pose)
-        robot_pose = np.matmul(world_camera_pose, inv_rel_camera_pose)
-        estimated_poses_list.append(robot_pose)
-    
-    if not estimated_poses_list:
-        # If we have no samples, report none
-        return (None, estimated_poses_list)
-			
-    total = np.array([0.0, 0.0, 0.0])
-    for pose in estimated_poses_list:
-        total += np.array([pose[0][3], pose[1][3], pose[2][3]])
-    average = total / len(estimated_poses_list)
-    return (average)
+# Constants
+
+# Camera Parameters:
+camera_info = {}
+# [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
+# focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
+
+# 1280,960 res: **UNTESTED**
+#camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
+#RES = (1280,960)
+# 640,480 res: 
+camera_info["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
+RES = (640,480)
+# 320,240 res: 
+#camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
+#RES = (320,240)
+
+camera_info["res"] = RES
+
+TAG_SIZE = 0.1651
+FAMILIES = "tag36h11"
+
+tags = Tag(TAG_SIZE, FAMILIES)
+poseEstimator = PoseEstimator()
+
+####################################################################################
+
+# INITIALIZE VARIABLES #
+
+# add tags:
+# takes in id,x,y,z,theta_x,theta_y,theta_z
+# theta_x:roll, theta_y:pitch, theta_z:yaw
+
+tags.addTag(0,0,0,0,0,0,0)
+tags.addTag(1, 0., 0, 0., 0., 0., 0)
+tags.addTag(2, 0., 18.22, 0., 0., 0., 180)
+tags.addTag(3, 0., 18.22, 0., 0., 0., 180)
+tags.addTag(4, 0., 27.38, 0., 0., 0., 180)
+tags.addTag(5, 0., 27.38, 0., 0., 0., 0.)
+tags.addTag(6, 0., 18.22, 0., 0., 0., 0.)
+tags.addTag(7, 0., 18.22, 0., 0., 0., 0.)
+tags.addTag(8, 0., 18.22, 0., 0., 0., 0.)
 
 ####################################################################################
 
@@ -385,8 +312,8 @@ if __name__ == "__main__":
 
     # loop forever
     while True:
-        time, frame = cvSink.grabFrame(frame)
-        if time == 0:
+        frameTime, frame = cvSink.grabFrame(frame)
+        if frameTime == 0:
             processedOutput.notifyError(cvSink.getError())
 
             continue
@@ -394,6 +321,7 @@ if __name__ == "__main__":
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         detected_tags = detector.detect(gray, estimate_tag_pose=True, camera_params=camera_info["params"], tag_size=TAG_SIZE)
+        #t1 = time()
         tags.addFoundTags(detected_tags)
         
         processedOutput.putFrame(visualize_frame(frame, tags.getFilteredTags()))
@@ -414,19 +342,17 @@ if __name__ == "__main__":
             x = (int((t[0]).astype(float)*inchesInAMeter*1000)) / 1000
             y = (int((t[1]).astype(float)*inchesInAMeter*1000)) / 1000
             z = (int((t[2]).astype(float)*inchesInAMeter*1000)) / 1000
-            #pose = np.multiply(estimate_camera_pose(tags.get_estimated_tag_poses()), inchesInAMeter)
-            pose = np.multiply(tags.estimate_tag_pose(ID, R, t), inchesInAMeter)
-            #distances = [x, y, z]
-            #angles  = [yaw, pitch, roll]
+            #pose = np.multiply(tags.estimate_camera_to_tag_pose(ID, R, t), inchesInAMeter)
             
-            # pose detector gives x (left and right), y (up and down),z (forward backward)
-            # robot uses x(forward backward), y(up and down), z (left and right)
-            camera_pose_on_robot = [7.25, 43.5, 7]
-            robot_pose = [(pose[0] + camera_pose_on_robot[0]), (pose[1] - camera_pose_on_robot[1]), (pose[2] + camera_pose_on_robot[2])]
-            raspberryPiTable.putNumberArray("robotPose", robot_pose)
-            #raspberryPiTable.putNumberArray("cameraPose", pose)
+        # pose detector gives x (left and right), y (up and down),z (forward backward)
+        # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
+        #pose = poseEstimator.estimatePoseMeters()
+        pose = tags.estimateTagPose(0, R, t)
+        raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[2], pose[0]])
 
         #tags.findClosestTag()
+        
+####################################################################################
 
 """
 
