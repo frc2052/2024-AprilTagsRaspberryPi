@@ -211,14 +211,14 @@ class PoseEstimator():
             estimated_poses_list.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
         
         if not estimated_poses_list:
+            print("no estimated poses list")
             # If we have no samples, report none
             return (None, estimated_poses_list)
                 
         total = np.array([0.0, 0.0, 0.0])
         for pose in estimated_poses_list:
-            print("added pose array" + str(pose[0]))
-            total = np.add(total, pose)
-        average = np.divide(len(estimated_poses_list), total)
+            total = ([(total[0] + pose[0]), (total[1] + pose[1]), (total[2] + pose[2])])
+        average = np.divide(total, len(estimated_poses_list))
         return (average)
         
 ####################################################################################
@@ -241,6 +241,8 @@ RES = (640,480)
 #RES = (320,240)
 
 camera_info["res"] = RES
+
+inchesInAMeter = 39.37
 
 TAG_SIZE = 0.1651
 FAMILIES = "tag36h11"
@@ -297,7 +299,7 @@ if __name__ == "__main__":
         cameras.append(startCamera(config))
 
     detector = Detector(families='tag36h11',
-                        nthreads=3,
+                        nthreads=4,
                         quad_decimate=2,
                         quad_sigma=0,
                         refine_edges=1,
@@ -338,19 +340,15 @@ if __name__ == "__main__":
             roll = math.degrees(math.atan2(R[1,0]/math.cos(yaw), R[0,0]/math.cos(yaw)))
 
             # convert meters to inches (inches * 39.37)
-            inchesInAMeter = 39.37
             x = (int((t[0]).astype(float)*inchesInAMeter*1000)) / 1000
             y = (int((t[1]).astype(float)*inchesInAMeter*1000)) / 1000
             z = (int((t[2]).astype(float)*inchesInAMeter*1000)) / 1000
-            #pose = np.multiply(tags.estimate_camera_to_tag_pose(ID, R, t), inchesInAMeter)
             
         # pose detector gives x (left and right), y (up and down),z (forward backward)
         # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
-        #pose = poseEstimator.estimatePoseMeters()
-        pose = tags.estimateTagPose(0, R, t)
-        raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[2], pose[0]])
-
-        #tags.findClosestTag()
+        pose = poseEstimator.estimatePoseMeters()
+        if pose[0] != None:
+            raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[2], pose[0], pose[1]])
         
 ####################################################################################
 
