@@ -126,7 +126,8 @@ class Tag():
         self.size = tag_size
         self.locations = {}
         self.orientations = {}
-        self.found_tags = []
+        self.found_tags0 = []
+        self.found_tags1 = []
         corr = np.eye(3)
         corr[0, 0] = -1
         self.tag_corr = corr
@@ -160,14 +161,23 @@ class Tag():
         #inches to meters
         return np.array([[x],[y],[z]])*0.0254
     
-    def addFoundTags(self, tags):
-        self.found_tags = []
-        for tag in tags:
-            if tag.hamming < 9:
-                self.found_tags.append(tag)
+    def addFoundTags(self, tags, cam):
+        if cam == 0:
+            self.found_tags0 = []
+            for tag in tags:
+                if tag.hamming < 9:
+                    self.found_tags0.append(tag)
+        if cam == 1:
+            self.found_tags1 = []
+            for tag in tags:
+                if tag.hamming < 9:
+                    self.found_tags1.append(tag)
 
-    def getFilteredTags(self):
-        return self.found_tags
+    def getFilteredTags(self, cam):
+        if cam == 0:
+            return self.found_tags0
+        if cam == 1:
+            return self.found_tags1
 
     def estimateTagPose(self, tag_id, R,t):
         local = self.tag_corr @ np.transpose(R) @ t
@@ -205,21 +215,31 @@ class PoseEstimator():
 
     def estimatePoseMeters(self):
         
-        estimated_poses_list = []
+        estimated_poses_list0 = []
+        estimated_poses_list1 = []
 
-        for tag in tags.getFilteredTags():
-            estimated_poses_list.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
+        for tag in tags.getFilteredTags(0):
+            estimated_poses_list0.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
+        for tag in tags.getFilteredTags(1):
+            estimated_poses_list1.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
         
-        if not estimated_poses_list:
+        if not estimated_poses_list0 or not estimated_poses_list1:
             print("no estimated poses list")
             # If we have no samples, report none
-            return (None, estimated_poses_list)
+            return (None, estimated_poses_list0)
                 
-        total = np.array([0.0, 0.0, 0.0])
-        for pose in estimated_poses_list:
-            total = ([(total[0] + pose[0]), (total[1] + pose[1]), (total[2] + pose[2])])
-        average = np.divide(total, len(estimated_poses_list))
-        return (average)
+        total0 = np.array([0.0, 0.0, 0.0])
+        total1 = np.array([0.0, 0.0, 0.0])
+
+        for pose in estimated_poses_list0:
+            total0 = ([(total[0] + pose[0]), (total[1] + pose[1]), (total[2] + pose[2])])
+        average0 = np.divide(total, len(estimated_poses_list0))
+
+        for pose in estimated_poses_list1:
+            total1 = ([(total[0] + pose[0]), (total[1] + pose[1]), (total[2] + pose[2])])
+        average1 = np.divide(total, len(estimated_poses_list1))
+
+        return ([average0, average1])
         
 ####################################################################################
 
@@ -298,7 +318,7 @@ if __name__ == "__main__":
     for config in cameraConfigs:
         cameras.append(startCamera(config))
 
-    detector = Detector(families='tag36h11',
+    detector0 = Detector(families='tag36h11',
                         nthreads=4,
                         quad_decimate=2,
                         quad_sigma=0,
@@ -306,30 +326,55 @@ if __name__ == "__main__":
                         decode_sharpening=0,
                         debug=0
                         )
-    cvSink = CameraServer.getVideo()
-    processedOutput = CameraServer.putVideo("processedOutput", RES[0], RES[1])
+    detector1 = Detector(families='tag36h11',
+                        nthreads=4,
+                        quad_decimate=2,
+                        quad_sigma=0,
+                        refine_edges=1,
+                        decode_sharpening=0,
+                        debug=0
+                        )
+    
 
-    frame = np.zeros(shape=(RES[1], RES[0], 3), dtype=np.uint8)
+    cvSink0 = CameraServer.getVideo("rPi Camera 0")
+    cvSink1 = CameraServer.getVideo("rPi Camera 1")
+
+    processedOutput0 = CameraServer.putVideo("processedOutput0", RES[0], RES[1])
+    processedOutput1 = CameraServer.putVideo("processedOutput1", RES[0], RES[1])
+
+    frame0 = np.zeros(shape=(RES[1], RES[0], 3), dtype=np.uint8)
+    frame1 = np.zeros(shape=(RES[1], RES[0], 3), dtype=np.uint8)
 
 
     # loop forever
     while True:
-        frameTime, frame = cvSink.grabFrame(frame)
+        frameTime, frame0 = cvSink0.grabFrame(frame0)
         if frameTime == 0:
-            processedOutput.notifyError(cvSink.getError())
+            processedOutput1.notifyError(cvSink1.getError())
+
+            continue
+        frameTime, frame1 = cvSink1.grabFrame(frame1)
+        if frameTime == 0:
+            processedOutput2.notifyError(cvSink2.getError())
 
             continue
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray0 = cv2.cvtColor(frame0, cv2.COLOR_BGR2GRAY)
+        gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
 
-        detected_tags = detector.detect(gray, estimate_tag_pose=True, camera_params=camera_info["params"], tag_size=TAG_SIZE)
+        detected_tags0 = detector0.detect(gray0, estimate_tag_pose=True, camera_params=camera_info["params"], tag_size=TAG_SIZE)
+        detected_tags1 = detector1.detect(gray1, estimate_tag_pose=True, camera_params=camera_info["params"], tag_size=TAG_SIZE)
+
         #t1 = time()
-        tags.addFoundTags(detected_tags)
+        tags.addFoundTags(detected_tags0, 0)
+        tags.addFoundTags(detected_tags1, 1)
         
-        processedOutput.putFrame(visualize_frame(frame, tags.getFilteredTags()))
+        processedOutput0.putFrame(visualize_frame(frame0, tags.getFilteredTags(0)))
+        processedOutput1.putFrame(visualize_frame(frame1, tags.getFilteredTags(1)))
         
-        outputTags = []
-
+        """
+        outputTags1 = []
+        outputTags2 = []
         for tag in tags.getFilteredTags():
             ID = tag.tag_id
             R = tag.pose_R
@@ -343,12 +388,14 @@ if __name__ == "__main__":
             x = (int((t[0]).astype(float)*inchesInAMeter*1000)) / 1000
             y = (int((t[1]).astype(float)*inchesInAMeter*1000)) / 1000
             z = (int((t[2]).astype(float)*inchesInAMeter*1000)) / 1000
+        """
             
         # pose detector gives x (left and right), y (up and down),z (forward backward)
         # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
         pose = poseEstimator.estimatePoseMeters()
         if pose[0] != None:
-            raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[2], pose[0], pose[1]])
+            raspberryPiTable.putNumberArray("camera0PoseMeters", [pose[0][2], pose[0][0], pose[0][1]])
+            raspberryPiTable.putNumberArray("camera1PoseMeters", [pose[1][2], pose[1][0], pose[1][1]])
         
 ####################################################################################
 
