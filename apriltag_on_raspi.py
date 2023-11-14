@@ -264,7 +264,7 @@ camera_info["res"] = RES
 
 inchesInAMeter = 39.37
 
-TAG_SIZE = 0.1651
+TAG_SIZE = (6.5)/39.37
 FAMILIES = "tag36h11"
 
 tags = Tag(TAG_SIZE, FAMILIES)
@@ -279,7 +279,7 @@ poseEstimator = PoseEstimator()
 # theta_x:roll, theta_y:pitch, theta_z:yaw
 
 tags.addTag(0,0,0,0,0,0,0)
-tags.addTag(1, 0., 0, 0., 0., 0., 0)
+tags.addTag(1, 0., 17.5, 0., 0., 0., 0)
 tags.addTag(2, 0., 18.22, 0., 0., 0., 180)
 tags.addTag(3, 0., 18.22, 0., 0., 0., 180)
 tags.addTag(4, 0., 27.38, 0., 0., 0., 180)
