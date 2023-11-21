@@ -171,6 +171,7 @@ class Tag():
 
     def estimateTagPose(self, tag_id, R,t):
         local = self.tag_corr @ np.transpose(R) @ t
+        print(self.orientations[tag_id])
         return np.matmul(self.orientations[tag_id], local + self.locations[tag_id])
 
 ####################################################################################
@@ -211,7 +212,7 @@ class PoseEstimator():
             estimated_poses_list.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
         
         if not estimated_poses_list:
-            print("no estimated poses list")
+            # print("no estimated poses list")
             # If we have no samples, report none
             return (None, estimated_poses_list)
                 
@@ -219,9 +220,9 @@ class PoseEstimator():
 
         for pose in estimated_poses_list:
             total = ([(total[0] + pose[0]), (total[1] + pose[1]), (total[2] + pose[2])])
-        average = np.divide(total, len(estimated_poses_list))
+        avg = np.divide(total, len(estimated_poses_list))
 
-        return (average)
+        return (avg)
         
 ####################################################################################
 
@@ -339,11 +340,12 @@ if __name__ == "__main__":
         pose = poseEstimator.estimatePoseMeters()
         if pose[0] != None:
             raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[2], pose[0], pose[1]])
-        
+            raspberryPiTable.putBoolean("tagFound", True)
+        if pose[0] == None:
+            raspberryPiTable.putBoolean("tagFound", False)
 ####################################################################################
 
 """
-
 DETECTOR PARAMETERS:
 
 PARAMETERS:
