@@ -170,9 +170,13 @@ class Tag():
         return self.found_tags
 
     def estimateTagPose(self, tag_id, R,t):
-        local = self.tag_corr @ np.transpose(R) @ t
-        print(self.orientations[tag_id])
-        return np.matmul(self.orientations[tag_id], local + self.locations[tag_id])
+        localTranslation = self.tag_corr @ np.transpose(R) @ t
+        #localTranslation = self.tag_corr @ t
+        #localRotation = self.tag_corr @ np.transpose(R)
+        #print(self.orientations[tag_id])
+        #return (localRotation+ self.orientations[tag_id], localTranslation + self.locations[tag_id])
+        tagYaw = math.degrees(math.atan2(-R[2, 0], math.sqrt(R[0,0]*R[0,0] + R[1,0]*R[1,0])))
+        return (localTranslation + self.locations[tag_id], tagYaw)
 
 ####################################################################################
 
@@ -212,17 +216,20 @@ class PoseEstimator():
             estimated_poses_list.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
         
         if not estimated_poses_list:
-            # print("no estimated poses list")
+            print("no estimated poses list")
             # If we have no samples, report none
             return (None, estimated_poses_list)
                 
         total = np.array([0.0, 0.0, 0.0])
+        totalYaw = 0.0
 
         for pose in estimated_poses_list:
-            total = ([(total[0] + pose[0]), (total[1] + pose[1]), (total[2] + pose[2])])
+            total = ([(total[0] + pose[0][0]), (total[1] + pose[0][1]), (total[2] + pose[0][2])])
+            totalYaw = totalYaw + pose[1]
         avg = np.divide(total, len(estimated_poses_list))
+        avgYaw = totalYaw / len(estimated_poses_list)
 
-        return (avg)
+        return (avg, avgYaw)
         
 ####################################################################################
 
@@ -259,10 +266,10 @@ poseEstimator = PoseEstimator()
 
 # add tags:
 # takes in id,x,y,z,theta_x,theta_y,theta_z
-# theta_x:roll, theta_y:pitch, theta_z:yaw
+# theta_x:roll, theta_y:pitch, theta_z:yaw in radians
 
 tags.addTag(0,0,0,0,0,0,0)
-tags.addTag(1, 0., 17.5, 0., 0., 0., 0)
+tags.addTag(1, 78.5, 17.5, 0., 0.2193, 0., 0)
 tags.addTag(2, 0., 18.22, 0., 0., 0., 180)
 tags.addTag(3, 0., 18.22, 0., 0., 0., 180)
 tags.addTag(4, 0., 27.38, 0., 0., 0., 180)
@@ -338,10 +345,10 @@ if __name__ == "__main__":
         # pose detector gives x (left and right), y (up and down),z (forward backward)
         # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
         pose = poseEstimator.estimatePoseMeters()
-        if pose[0] != None:
-            raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[2], pose[0], pose[1]])
+        if np.all(pose[0]):
+            raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[0][2], pose[0][0], pose[0][1], pose[1]])
             raspberryPiTable.putBoolean("tagFound", True)
-        if pose[0] == None:
+        else:
             raspberryPiTable.putBoolean("tagFound", False)
 ####################################################################################
 
