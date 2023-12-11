@@ -237,6 +237,7 @@ class PoseEstimator():
 
 # Camera Parameters:
 camera_info = {}
+camera_info["cameraName"] = "camera1"
 # [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
 # focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
 
@@ -329,7 +330,7 @@ if __name__ == "__main__":
     while True:
         frameTime, frame = cvSink.grabFrame(frame)
         if frameTime == 0:
-            processedOutput1.notifyError(cvSink.getError())
+            processedOutput.notifyError(cvSink.getError())
 
             continue
 
@@ -346,10 +347,10 @@ if __name__ == "__main__":
         # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
         pose = poseEstimator.estimatePoseMeters()
         if np.all(pose[0]):
-            raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[0][2], pose[0][0], pose[0][1], pose[1]])
-            raspberryPiTable.putBoolean("tagFound", True)
+            raspberryPiTable.putNumberArray(camera_info["cameraName"], [pose[0][2], pose[0][0], pose[0][1], pose[1]])
+            raspberryPiTable.putBoolean(camera_info["cameraName"]+ "tagFound", True)
         else:
-            raspberryPiTable.putBoolean("tagFound", False)
+            raspberryPiTable.putBoolean(camera_info["cameraName"]+ "tagFound", False)
 ####################################################################################
 
 """
