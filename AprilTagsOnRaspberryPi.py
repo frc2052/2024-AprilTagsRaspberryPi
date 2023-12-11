@@ -171,12 +171,7 @@ class Tag():
 
     def estimateTagPose(self, tag_id, R,t):
         localTranslation = self.tag_corr @ np.transpose(R) @ t
-        #localTranslation = self.tag_corr @ t
-        #localRotation = self.tag_corr @ np.transpose(R)
-        #print(self.orientations[tag_id])
-        #return (localRotation+ self.orientations[tag_id], localTranslation + self.locations[tag_id])
-        tagYaw = math.degrees(math.atan2(-R[2, 0], math.sqrt(R[0,0]*R[0,0] + R[1,0]*R[1,0])))
-        return (localTranslation + self.locations[tag_id], tagYaw)
+        return (localTranslation + self.locations[tag_id])
 
 ####################################################################################
 
@@ -221,15 +216,12 @@ class PoseEstimator():
             return (None, estimated_poses_list)
                 
         total = np.array([0.0, 0.0, 0.0])
-        totalYaw = 0.0
 
         for pose in estimated_poses_list:
-            total = ([(total[0] + pose[0][0]), (total[1] + pose[0][1]), (total[2] + pose[0][2])])
-            totalYaw = totalYaw + pose[1]
+            total = ([(total[0] + pose[0]), (total[1] + pose[1]), (total[2] + pose[2])])
         avg = np.divide(total, len(estimated_poses_list))
-        avgYaw = totalYaw / len(estimated_poses_list)
 
-        return (avg, avgYaw)
+        return (avg)
         
 ####################################################################################
 
@@ -270,13 +262,6 @@ poseEstimator = PoseEstimator()
 
 tags.addTag(0,0,0,0,0,0,0)
 tags.addTag(1, 78.5, 17.5, 0., 0.2193, 0., 0)
-tags.addTag(2, 0., 18.22, 0., 0., 0., 180)
-tags.addTag(3, 0., 18.22, 0., 0., 0., 180)
-tags.addTag(4, 0., 27.38, 0., 0., 0., 180)
-tags.addTag(5, 0., 27.38, 0., 0., 0., 0.)
-tags.addTag(6, 0., 18.22, 0., 0., 0., 0.)
-tags.addTag(7, 0., 18.22, 0., 0., 0., 0.)
-tags.addTag(8, 0., 18.22, 0., 0., 0., 0.)
 
 ####################################################################################
 
@@ -337,7 +322,6 @@ if __name__ == "__main__":
 
         detected_tags = detector.detect(gray, estimate_tag_pose=True, camera_params=camera_info["params"], tag_size=TAG_SIZE)
 
-        #t1 = time()
         tags.addFoundTags(detected_tags)
         
         processedOutput.putFrame(visualize_frame(frame, tags.getFilteredTags()))
@@ -345,38 +329,8 @@ if __name__ == "__main__":
         # pose detector gives x (left and right), y (up and down),z (forward backward)
         # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
         pose = poseEstimator.estimatePoseMeters()
-        if np.all(pose[0]):
-            raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[0][2], pose[0][0], pose[0][1], pose[1]])
+        if pose[0] != None:
+            raspberryPiTable.putNumberArray("cameraPoseMeters", [pose[2], pose[0], pose[1]])
             raspberryPiTable.putBoolean("tagFound", True)
         else:
             raspberryPiTable.putBoolean("tagFound", False)
-####################################################################################
-
-"""
-DETECTOR PARAMETERS:
-
-PARAMETERS:
-families : Tag families, separated with a space, default: tag36h11
-
-nthreads : Number of threads, default: 1
-
-quad_decimate : Detection of quads can be done on a lower-resolution image, 
-improving speed at a cost of pose accuracy and a slight decrease in detection rate. 
-Decoding the binary payload is still done at full resolution, default: 2.0
-
-quad_sigma : What Gaussian blur should be applied to the segmented image (used for 
-quad detection?) Parameter is the standard deviation in pixels. Very noisy images 
-benefit from non-zero values (e.g. 0.8), default: 0.0
-
-refine_edges : When non-zero, the edges of the each quad are adjusted to “snap to” 
-strong gradients nearby. This is useful when decimation is employed, as it can increase 
-the quality of the initial quad estimate substantially. Generally recommended to be 
-on (1). Very computationally inexpensive. Option is ignored if quad_decimate = 0, 
-default: 1
-
-decode_sharpening : How much sharpening should be done to decoded images? This can 
-help decode small tags but may or may not help in odd lighting conditions or low light 
-conditions, default = 0.25
-
-debug : If 1, will save debug images. Runs very slow, default: 0
-"""
