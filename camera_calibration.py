@@ -5,7 +5,7 @@ import numpy as np
 import os
 import glob
 
-RES = (640,480)
+RES = (320,240)
 
 folder_name= f"calibration_{RES[0]}_{RES[1]}/"
 os.makedirs(folder_name,exist_ok=True)
@@ -24,7 +24,7 @@ img_folder=glob.glob(folder_name+ "*.png")
  
 # Defining the dimensions of checkerboard
 CHECKERBOARD = (6,8)
-criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
  
 # Creating vector to store vectors of 3D points for each checkerboard image
 objpoints = []
