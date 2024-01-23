@@ -240,22 +240,33 @@ camera_info = {}
 camera_info["cameraName"] = "camera1"
 # [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
 # focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
-
-# 1280,960 res: **UNTESTED**
-#camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
-#RES = (1280,960)
+# microsoft lifecam whatever
+# 800,600 res: **UNTESTED**
+#camera_info["params"] = [920.650966443195, 922.3290576723556, 366.15244139496315, 289.0444766286031] 
+#RES = (800,600)
 # 640,480 res: 
-camera_info["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
-RES = (640,480)
+#camera_info["params"] = [736.5207731545559, 737.8632461378844, 292.9219531159705, 231.23558130288245]
+#RES = (640,480)
 # 320,240 res: 
-#camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
+#camera_info["params"] = [368.260386577278, 368.9316230689422, 146.4609765579853, 115.6177906514412]
 #RES = (320,240)
+
+# arducam
+# 720p
+RES = (640,480)
+camera_info["params"] = [898.4148530022999, 898.5742680597226, 604.3012198774147, 353.6334217128651]
+# 600p
+# RES = (800,600)
+# camera_info["params"] = [748.6790441685832, 748.8118900497689, 377.68826242338423, 294.6945180940542] 
+# 480p
+# RES = (640,480)
+# camera_info["params"] = [598.9432353348666, 599.049512039815, 302.15060993870736, 235.75561447524336]
 
 camera_info["res"] = RES
 
 inchesInAMeter = 39.37
 
-TAG_SIZE = (6.5)/39.37
+TAG_SIZE = (6.5 / inchesInAMeter)
 FAMILIES = "tag36h11"
 
 tags = Tag(TAG_SIZE, FAMILIES)
@@ -310,16 +321,16 @@ if __name__ == "__main__":
         cameras.append(startCamera(config))
 
     detector = Detector(families='tag36h11',
-                        nthreads=4,
-                        quad_decimate=2,
-                        quad_sigma=0,
-                        refine_edges=1,
-                        decode_sharpening=0,
+                        nthreads=4, 
+                        quad_decimate=1,
+                        quad_sigma=1,
+                        refine_edges=0,
+                        decode_sharpening=0.25,
                         debug=0
                         )
     
 
-    cvSink = CameraServer.getVideo("rPi Camera 0")
+    cvSink = CameraServer.getVideo("rPi Camera 1")
 
     processedOutput = CameraServer.putVideo("processedOutput", RES[0], RES[1])
 
@@ -351,33 +362,3 @@ if __name__ == "__main__":
             raspberryPiTable.putBoolean(camera_info["cameraName"]+ "tagFound", True)
         else:
             raspberryPiTable.putBoolean(camera_info["cameraName"]+ "tagFound", False)
-####################################################################################
-
-"""
-DETECTOR PARAMETERS:
-
-PARAMETERS:
-families : Tag families, separated with a space, default: tag36h11
-
-nthreads : Number of threads, default: 1
-
-quad_decimate : Detection of quads can be done on a lower-resolution image, 
-improving speed at a cost of pose accuracy and a slight decrease in detection rate. 
-Decoding the binary payload is still done at full resolution, default: 2.0
-
-quad_sigma : What Gaussian blur should be applied to the segmented image (used for 
-quad detection?) Parameter is the standard deviation in pixels. Very noisy images 
-benefit from non-zero values (e.g. 0.8), default: 0.0
-
-refine_edges : When non-zero, the edges of the each quad are adjusted to “snap to” 
-strong gradients nearby. This is useful when decimation is employed, as it can increase 
-the quality of the initial quad estimate substantially. Generally recommended to be 
-on (1). Very computationally inexpensive. Option is ignored if quad_decimate = 0, 
-default: 1
-
-decode_sharpening : How much sharpening should be done to decoded images? This can 
-help decode small tags but may or may not help in odd lighting conditions or low light 
-conditions, default = 0.25
-
-debug : If 1, will save debug images. Runs very slow, default: 0
-"""

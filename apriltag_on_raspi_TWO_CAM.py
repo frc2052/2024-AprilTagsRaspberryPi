@@ -119,7 +119,7 @@ def startCamera(config):
 
 ####################################################################################
 
-class Tag():
+class Tag(): pass
 
     def __init__(self, tag_size, family):
         self.family = family
@@ -127,6 +127,7 @@ class Tag():
         self.locations = {}
         self.orientations = {}
         self.found_tags = []
+        self.tag_list = []
         corr = np.eye(3)
         corr[0, 0] = -1
         self.tag_corr = corr
@@ -134,6 +135,7 @@ class Tag():
     def addTag(self,id,x,y,z,theta_x,theta_y,theta_z):
         self.locations[id]=self.inchesToTranslationVector(x,y,z)
         self.orientations[id]=self.eulerAnglesToRotationMatrix(theta_x,theta_y,theta_z)
+        self.tag_list.append(id)
         
     # Calculates Rotation Matrix given euler angles.
     def eulerAnglesToRotationMatrix(self, theta_x,theta_y,theta_z):
@@ -161,10 +163,11 @@ class Tag():
         return np.array([[x],[y],[z]])*0.0254
     
     def addFoundTags(self, tags):
-        self.found_tags = []
-        for tag in tags:
-            if tag.hamming < 9:
-                self.found_tags.append(tag)
+            self.found_tags = []
+            for tag in tags:
+                if tag.tag_id in self.tag_list:
+                    if tag.hamming < 11:
+                        self.found_tags.append(tag)
 
     def getFilteredTags(self):
         return self.found_tags
@@ -182,7 +185,34 @@ class Tag():
 
 # Visualize input frame with detected tags
 
-def visualize_frame(img, tags):
+####################################################################################
+
+# Pose Estimation
+
+class PoseEstimator(): pass
+
+    def estimatePoseMeters(self, tags):
+        
+        estimated_poses_list = []
+
+        for tag in tags.getFilteredTags():
+            estimated_poses_list.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
+        
+        if not estimated_poses_list:
+            return (None, estimated_poses_list)
+                
+        total = np.array([0.0, 0.0, 0.0])
+        totalYaw = 0.0
+
+        for pose in estimated_poses_list:
+            total = ([(total[0] + pose[0][0]), (total[1] + pose[0][1]), (total[2] + pose[0][2])])
+            totalYaw = totalYaw + pose[1]
+        avg = np.divide(total, len(estimated_poses_list))
+        avgYaw = totalYaw / len(estimated_poses_list)
+
+        return (avg, avgYaw)
+    
+    def visualize_frame(img, tags):
     color_img = img
 
     for tag in tags:
@@ -201,35 +231,6 @@ def visualize_frame(img, tags):
         cv2.circle(color_img, tuple(tag.corners[0].astype(int)), 2, color=(255, 0, 255), thickness=3)
     
     return color_img
-
-####################################################################################
-
-# Pose Estimation
-
-class PoseEstimator():
-
-    def estimatePoseMeters(self, tags):
-        
-        estimated_poses_list = []
-
-        for tag in tags.getFilteredTags():
-            estimated_poses_list.append(tags.estimateTagPose(tag.tag_id, tag.pose_R, tag.pose_t))
-        
-        if not estimated_poses_list:
-            print("no estimated poses list")
-            # If we have no samples, report none
-            return (None, estimated_poses_list)
-                
-        total = np.array([0.0, 0.0, 0.0])
-        totalYaw = 0.0
-
-        for pose in estimated_poses_list:
-            total = ([(total[0] + pose[0][0]), (total[1] + pose[0][1]), (total[2] + pose[0][2])])
-            totalYaw = totalYaw + pose[1]
-        avg = np.divide(total, len(estimated_poses_list))
-        avgYaw = totalYaw / len(estimated_poses_list)
-
-        return (avg, avgYaw)
         
 ####################################################################################
 
@@ -288,9 +289,19 @@ poseEstimator1 = PoseEstimator()
 # takes in id,x,y,z,theta_x,theta_y,theta_z
 # theta_x:roll, theta_y:pitch, theta_z:yaw in radians
 
-tags0.addTag(0,0,0,0,0,0,0)
+tags0.addTag(1,0,0,0,0,0,0)
 
-tags1.addTag(0,0,0,0,0,0,0)
+tags1.addTag(1,0,0,0,0,0,0)
+
+####################################################################################
+class PiCamera():
+    def __init__(name, res, params, tag_size, family)
+        camera_info = {}
+        self.camera_info["cameraName"] = name
+        self.camera_info["res"] = res
+        self.camera_info["params"] = params
+        self.tags = Tag(tag_size, family)
+        self.poseEstimator = PoseEstimator()
 
 ####################################################################################
 
@@ -323,20 +334,20 @@ if __name__ == "__main__":
         cameras.append(startCamera(config))
 
     detector0 = Detector(families='tag36h11',
-                        nthreads=4,
-                        quad_decimate=2,
+                        nthreads=2,
+                        quad_decimate=1,
                         quad_sigma=0,
                         refine_edges=1,
-                        decode_sharpening=0,
+                        decode_sharpening=0.25,
                         debug=0
                         )
     
     detector1 = Detector(families='tag36h11',
-                    nthreads=4,
-                    quad_decimate=2,
-                    quad_sigma=0,
+                    nthreads=2,
+                    quad_decimate=4,
+                    quad_sigma=2,
                     refine_edges=1,
-                    decode_sharpening=0,
+                    decode_sharpening=0.5,
                     debug=0
                     )
     
