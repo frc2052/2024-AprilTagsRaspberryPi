@@ -119,7 +119,7 @@ def startCamera(config):
 
 ####################################################################################
 
-class Tag(): pass
+class Tag():
 
     def __init__(self, tag_size, family):
         self.family = family
@@ -189,7 +189,7 @@ class Tag(): pass
 
 # Pose Estimation
 
-class PoseEstimator(): pass
+class PoseEstimator():
 
     def estimatePoseMeters(self, tags):
         
@@ -212,25 +212,25 @@ class PoseEstimator(): pass
 
         return (avg, avgYaw)
     
-    def visualize_frame(img, tags):
-    color_img = img
+    def visualize_frame(self, img, tags):
+        color_img = img
 
-    for tag in tags:
-        # Add bounding rectangle
-        for idx in range(len(tag.corners)):
-            cv2.line(color_img, tuple(tag.corners[idx - 1, :].astype(int)), tuple(tag.corners[idx, :].astype(int)),
-                    (0, 255, 0), thickness=3)
-        # Add Tag ID text
-        cv2.putText(color_img, str(tag.tag_id),
-                    org=(tag.corners[0, 0].astype(int) + 10, tag.corners[0, 1].astype(int) + 10),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                    fontScale=0.8,
-                    color=(0, 0, 255),
-                    thickness=3)
-        # Add Tag Corner
-        cv2.circle(color_img, tuple(tag.corners[0].astype(int)), 2, color=(255, 0, 255), thickness=3)
+        for tag in tags:
+            # Add bounding rectangle
+            for idx in range(len(tag.corners)):
+                cv2.line(color_img, tuple(tag.corners[idx - 1, :].astype(int)), tuple(tag.corners[idx, :].astype(int)),
+                        (0, 255, 0), thickness=3)
+            # Add Tag ID text
+            cv2.putText(color_img, str(tag.tag_id),
+                        org=(tag.corners[0, 0].astype(int) + 10, tag.corners[0, 1].astype(int) + 10),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.8,
+                        color=(0, 0, 255),
+                        thickness=3)
+            # Add Tag Corner
+            cv2.circle(color_img, tuple(tag.corners[0].astype(int)), 2, color=(255, 0, 255), thickness=3)
     
-    return color_img
+        return color_img
         
 ####################################################################################
 
@@ -246,7 +246,7 @@ camera_info0["cameraName"] = "rPi Camera 0"
 #camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
 #RES = (1280,960)
 # 640,480 res: 
-camera_info0["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
+camera_info0["params"] = [598.5536901377677, 598.8216046254148, 298.147467558688, 238.07890263167957]
 RES = (640,480)
 # 320,240 res: 
 #camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
@@ -263,7 +263,8 @@ camera_info1["cameraName"] = "rPi Camera 1"
 #camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
 #RES = (1280,960)
 # 640,480 res: 
-camera_info1["params"] = [669.13345619, 669.13345619, 319.63326201, 243.27625621]
+camera_info1["params"] = [598.5536901377677, 598.8216046254148, 298.147467558688, 238.07890263167957]
+#camera_info1["params"] = [783.1778628279454 / 2, 790.6970600029988 / 2, 667.0885654951866 / 2, 290.4174095459756 / 2]
 RES = (640,480)
 # 320,240 res: 
 #camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
@@ -295,7 +296,7 @@ tags1.addTag(1,0,0,0,0,0,0)
 
 ####################################################################################
 class PiCamera():
-    def __init__(name, res, params, tag_size, family)
+    def __init__(name, res, params, tag_size, family):
         camera_info = {}
         self.camera_info["cameraName"] = name
         self.camera_info["res"] = res
@@ -344,10 +345,10 @@ if __name__ == "__main__":
     
     detector1 = Detector(families='tag36h11',
                     nthreads=2,
-                    quad_decimate=4,
-                    quad_sigma=2,
+                    quad_decimate=1,
+                    quad_sigma=0,
                     refine_edges=1,
-                    decode_sharpening=0.5,
+                    decode_sharpening=0.25,
                     debug=0
                     )
     
@@ -385,8 +386,8 @@ if __name__ == "__main__":
         tags0.addFoundTags(detected_tags0)
         tags1.addFoundTags(detected_tags1)
         
-        processedOutput0.putFrame(visualize_frame(frame0, tags0.getFilteredTags()))
-        processedOutput1.putFrame(visualize_frame(frame1, tags1.getFilteredTags()))
+        processedOutput0.putFrame(poseEstimator0.visualize_frame(frame0, tags0.getFilteredTags()))
+        processedOutput1.putFrame(poseEstimator1.visualize_frame(frame1, tags1.getFilteredTags()))
             
         # pose detector gives x (left and right), y (up and down),z (forward backward)
         # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
