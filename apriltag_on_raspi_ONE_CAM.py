@@ -237,7 +237,7 @@ class PoseEstimator():
 
 # Camera Parameters:
 camera_info = {}
-camera_info["cameraName"] = "camera1"
+camera_info["cameraName"] = "PiCamera1"
 # [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
 # focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
 # microsoft lifecam whatever
@@ -330,7 +330,7 @@ if __name__ == "__main__":
                         )
     
 
-    cvSink = CameraServer.getVideo("rPi Camera 1")
+    cvSink = CameraServer.getVideo("PiCamera1")
 
     processedOutput = CameraServer.putVideo("processedOutput", RES[0], RES[1])
 

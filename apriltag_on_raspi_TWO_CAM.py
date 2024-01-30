@@ -335,7 +335,7 @@ if __name__ == "__main__":
         cameras.append(startCamera(config))
 
     detector0 = Detector(families='tag36h11',
-                        nthreads=2,
+                        nthreads=4,
                         quad_decimate=1,
                         quad_sigma=0,
                         refine_edges=1,
@@ -343,18 +343,18 @@ if __name__ == "__main__":
                         debug=0
                         )
     
-    detector1 = Detector(families='tag36h11',
-                    nthreads=2,
-                    quad_decimate=1,
-                    quad_sigma=0,
-                    refine_edges=1,
-                    decode_sharpening=0.25,
-                    debug=0
-                    )
+    # detector1 = Detector(families='tag36h11',
+    #                 nthreads=2,
+    #                 quad_decimate=1,
+    #                 quad_sigma=0,
+    #                 refine_edges=1,
+    #                 decode_sharpening=0.25,
+    #                 debug=0
+    #                 )
     
 
-    cvSink0 = CameraServer.getVideo("rPi Camera 0")
-    cvSink1 = CameraServer.getVideo("rPi Camera 1")
+    cvSink0 = CameraServer.getVideo(camera_info0["cameraName"])
+    cvSink1 = CameraServer.getVideo(camera_info1["cameraName"])
 
     processedOutput0 = CameraServer.putVideo("processedOutput0", RES[0], RES[1])
     processedOutput1 = CameraServer.putVideo("processedOutput1", RES[0], RES[1])
@@ -380,14 +380,17 @@ if __name__ == "__main__":
         gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
 
         detected_tags0 = detector0.detect(gray0, estimate_tag_pose=True, camera_params=camera_info0["params"], tag_size=TAG_SIZE)
-        detected_tags1 = detector1.detect(gray1, estimate_tag_pose=True, camera_params=camera_info1["params"], tag_size=TAG_SIZE)
+        #detected_tags1 = detector1.detect(gray1, estimate_tag_pose=True, camera_params=camera_info1["params"], tag_size=TAG_SIZE)
+        detected_tags1 = detector0.detect(gray1, estimate_tag_pose=True, camera_params=camera_info1["params"], tag_size=TAG_SIZE)
 
         #t1 = time()
         tags0.addFoundTags(detected_tags0)
         tags1.addFoundTags(detected_tags1)
         
-        processedOutput0.putFrame(poseEstimator0.visualize_frame(frame0, tags0.getFilteredTags()))
-        processedOutput1.putFrame(poseEstimator1.visualize_frame(frame1, tags1.getFilteredTags()))
+        if frameTime0 % 2 == 0:
+            processedOutput0.putFrame(poseEstimator0.visualize_frame(frame0, tags0.getFilteredTags()))
+        if frameTime1 % 2 == 0:
+            processedOutput1.putFrame(poseEstimator1.visualize_frame(frame1, tags1.getFilteredTags()))
             
         # pose detector gives x (left and right), y (up and down),z (forward backward)
         # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
