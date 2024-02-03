@@ -212,7 +212,7 @@ class PoseEstimator():
 
         return (avg, avgYaw)
     
-    def visualize_frame(self, img, tags):
+    def visualizeFrame(self, img, tags):
         color_img = img
 
         for tag in tags:
@@ -244,23 +244,37 @@ class PiCamera():
         self.family = family
         self.tags = Tag(tag_size, family)
         self.poseEstimator = PoseEstimator()
+        self.pose = {}
     
-    def addTag(self, tag):
-        self.tags.addTag(tag)
+    def addTag(self, id, x, y, z, theta_x, theta_y, theta_z):
+        self.tags.addTag(id, x, y, z, theta_x, theta_y, theta_z)
     
-    def addFoundTag(self, foundTags):
+    def addFoundTags(self, foundTags):
         self.tags.addFoundTags(foundTags)
+    
+    def estimatePose(self, frame):
+        self.pose = self.poseEstimator.estimatePoseMeters(self.tags)
 
-    def visualizeFrame(self, frame):
-        self.poseEstimator(frame, self.tags.getFilteredTags())
+    def visualizeFrame(self, gray):
+        return self.poseEstimator.visualizeFrame(gray, self.tags.getFilteredTags())
+    
+    def addOutputStream(self, processedOutput):
+        self.processedOutput = processedOutput
+
+    def getOutputStream(self):
+        return self.processedOutput
+    
+    def addCVSink(self, cvSink):
+        self.cvSink = cvSink
+
+    def getCVSink(self):
+        return self.cvSink
 
     def outputPoses(self):
-            pose = self.poseEstimator.estimatePoseMeters(self.tags.getFilteredTags())
-
             # pose detector gives x (left and right), y (up and down),z (forward backward)
             # field relative: x (points away away from driverstation aka forward backward) y (perpendicular to x aka left and right)
-            if np.all(pose[0]):
-                raspberryPiTable.putNumberArray(self.camera_info["cameraName"], [pose[0][2], pose[0][0], pose[0][1], pose[1]])
+            if np.all(self.pose[0]):
+                #raspberryPiTable.putNumberArray(self.camera_info["cameraName"], [self.pose[0][2], self.pose[0][0], self.pose[0][1], self.pose[1]])
                 raspberryPiTable.putBoolean(self.camera_info["cameraName"]+ "tagFound", True)
             else:
                 raspberryPiTable.putBoolean(self.camera_info["cameraName"]+ "tagFound", False)
@@ -268,22 +282,6 @@ class PiCamera():
 ####################################################################################
 
 # Constants
-
-# Camera Parameters:
-# camera_info0 = {}
-# camera_info0["cameraName"] = "rPi Camera 0"
-# [fx, fy, cx, cy] f is focal length in pixels x and y, c is optical center in pixels x and y.
-# focal_pixel = (image_width_in_pixels * 0.5) / tan(FOV * 0.5 * PI/180)
-
-# 1280,960 res: **UNTESTED**
-#camera_info["params"] = [1338.26691, 1338.26691, 639.266524, 486.552512] 
-#RES = (1280,960)
-# 640,480 res: 
-# camera_info0["params"] = [598.5536901377677, 598.8216046254148, 298.147467558688, 238.07890263167957]
-# RES = (640,480)
-# 320,240 res: 
-#camera_info["params"] = [334.566728095, 334.566728095, 159.816631005, 121.638128105]
-#RES = (320,240)
 
 RES = (640,480)
 
@@ -293,12 +291,8 @@ TAG_SIZE = (6.5)/39.37
 FAMILIES = "tag36h11"
 
 cams = []
-cams.add(PiCamera("rPi Camera 0", RES, [598.5536901377677, 598.8216046254148, 298.147467558688, 238.07890263167957],TAG_SIZE, FAMILIES))
-
-# tags0 = Tag(TAG_SIZE, FAMILIES)
-# tags1 = Tag(TAG_SIZE, FAMILIES)
-# poseEstimator0 = PoseEstimator()
-# poseEstimator1 = PoseEstimator()
+cams.append(PiCamera("PiCamera1", RES, [598.5536901377677, 598.8216046254148, 298.147467558688, 238.07890263167957],TAG_SIZE, FAMILIES))
+cams.append(PiCamera("PiCamera2", RES, [598.5536901377677, 598.8216046254148, 298.147467558688, 238.07890263167957],TAG_SIZE, FAMILIES))
 
 # add tags:
 # takes in id,x,y,z,theta_x,theta_y,theta_z
@@ -347,16 +341,16 @@ if __name__ == "__main__":
                         )
     
     for cam in cams:
-        cvSink = CameraServer.getVideo(cam.camera_info["cameraName"])
-        processedOutput = CameraServer.putVideo("Processed Output " + cam.camera_info["cameraName"], cam.camera_info["RES"][0], cam.camera_info["RES"][1])
-        frame = np.zeros(shape=(RES[1], RES[0], 3), dtype=np.uint8)
+        cam.addCVSink(CameraServer.getVideo(cam.camera_info["cameraName"]))
+        cam.addOutputStream(CameraServer.putVideo("Processed Output " + cam.camera_info["cameraName"], cam.camera_info["res"][0], cam.camera_info["res"][1]))
 
     # loop forever
     while True:
         for cam in cams:
-            frameTime, frame = cvSink.grabFrame(frame)
+            frame = np.zeros(shape=(RES[1], RES[0], 3), dtype=np.uint8)
+            frameTime, frame = cam.getCVSink().grabFrame(frame)
             if frameTime == 0:
-                processedOutput.notifyError(cvSink.getError())
+                cam.getOutputStream().notifyError(cam.getCVSink().getError())
 
                 continue
 
@@ -366,10 +360,10 @@ if __name__ == "__main__":
 
             #t1 = time()
             cam.addFoundTags(detected_tags)
-            
-            if frameTime % 2 == 0:
-                processedOutput.putFrame(cam.visualize_frame(frame))
 
+            cam.getOutputStream().putFrame(cam.visualizeFrame(frame))
+
+            cam.estimatePose(frame)
             cam.outputPoses()
 
 ####################################################################################
